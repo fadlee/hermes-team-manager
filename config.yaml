@@ -9,6 +9,8 @@ display:
       tool_progress: "off"
       live_status: "off"
 approvals:
-  mode: "off"
+  mode: smart
+command_allowlist:
+  - "hermes send --to *"
 gateway:
   multiplex_profiles: false
