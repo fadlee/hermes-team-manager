@@ -8,5 +8,7 @@ display:
     whatsapp:
       tool_progress: "off"
       live_status: "off"
+approvals:
+  mode: "off"
 gateway:
   multiplex_profiles: false
