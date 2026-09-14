@@ -1,6 +1,12 @@
 agent:
   max_turns: 150
+browser:
+  backend: none
+display:
+  tool_progress: "off"
+  platforms:
+    whatsapp:
+      tool_progress: "off"
+      live_status: "off"
 gateway:
   multiplex_profiles: false
-display:
-  tool_progress: null
