@@ -18,9 +18,24 @@ export function parseAllowedUsers(rawValue) {
   );
 }
 
-export function getCompanyAllowedUsers(rootDir = process.env.HERMES_HOME) {
-  if (!rootDir || !existsSync(rootDir)) return new Set();
-  const allowed = new Set();
+export function getCompanyOwnerNumber(rootDir = process.env.HERMES_HOME) {
+  if (!rootDir || !existsSync(rootDir)) return null;
+  try {
+    const companyFile = path.join(rootDir, 'company', 'company.md');
+    if (existsSync(companyFile)) {
+      const content = readFileSync(companyFile, 'utf8');
+      const match = content.match(/^owner_whatsapp:\s*["']?([^"'\r\n]+)["']?/m);
+      if (match && match[1]) {
+        return normalizeWhatsAppIdentifier(match[1]);
+      }
+    }
+  } catch {}
+  return null;
+}
+
+export function getCompanyMembers(rootDir = process.env.HERMES_HOME) {
+  if (!rootDir || !existsSync(rootDir)) return {};
+  const members = {};
   try {
     const membersDir = path.join(rootDir, 'company', 'members');
     if (existsSync(membersDir)) {
@@ -28,23 +43,37 @@ export function getCompanyAllowedUsers(rootDir = process.env.HERMES_HOME) {
       for (const file of files) {
         if (!file.endsWith('.md') || file.startsWith('_')) continue;
         const content = readFileSync(path.join(membersDir, file), 'utf8');
-        const match = content.match(/^whatsapp:\s*["']?([^"'\r\n]+)["']?/m);
-        if (match && match[1]) {
-          const num = normalizeWhatsAppIdentifier(match[1]);
-          if (num && !num.startsWith('62811100000')) allowed.add(num);
+        const idMatch = content.match(/^id:\s*["']?([^"'\r\n]+)["']?/m) || [null, path.basename(file, '.md')];
+        const nameMatch = content.match(/^name:\s*["']?([^"'\r\n]+)["']?/m);
+        const roleMatch = content.match(/^role:\s*["']?([^"'\r\n]+)["']?/m);
+        const waMatch = content.match(/^whatsapp:\s*["']?([^"'\r\n]+)["']?/m);
+        if (waMatch && waMatch[1]) {
+          const num = normalizeWhatsAppIdentifier(waMatch[1]);
+          if (num && !num.startsWith('62811100000')) {
+            members[num] = {
+              id: idMatch[1] || path.basename(file, '.md'),
+              name: nameMatch ? nameMatch[1] : idMatch[1],
+              role: roleMatch ? roleMatch[1] : 'Anggota Tim',
+            };
+          }
         }
       }
     }
-    const companyFile = path.join(rootDir, 'company', 'company.md');
-    if (existsSync(companyFile)) {
-      const content = readFileSync(companyFile, 'utf8');
-      const match = content.match(/^owner_whatsapp:\s*["']?([^"'\r\n]+)["']?/m);
-      if (match && match[1]) {
-        const num = normalizeWhatsAppIdentifier(match[1]);
-        if (num && !num.startsWith('62811100000')) allowed.add(num);
-      }
-    }
   } catch {}
+  return members;
+}
+
+export function getCompanyAllowedUsers(rootDir = process.env.HERMES_HOME) {
+  if (!rootDir || !existsSync(rootDir)) return new Set();
+  const allowed = new Set();
+  const ownerNum = getCompanyOwnerNumber(rootDir);
+  if (ownerNum && !ownerNum.startsWith('62811100000')) {
+    allowed.add(ownerNum);
+  }
+  const members = getCompanyMembers(rootDir);
+  for (const num of Object.keys(members)) {
+    allowed.add(num);
+  }
   return allowed;
 }
 
@@ -69,8 +98,6 @@ export function expandWhatsAppIdentifiers(identifier, sessionDir) {
     return new Set();
   }
 
-  // Walk both phone->LID and LID->phone mapping files so allowlists can use
-  // either form transparently in bot mode.
   const resolved = new Set();
   const queue = [normalized];
 
@@ -93,6 +120,22 @@ export function expandWhatsAppIdentifiers(identifier, sessionDir) {
   return resolved;
 }
 
+export function isOwnerSender(senderId, sessionDir, rootDir = process.env.HERMES_HOME) {
+  const ownerNum = getCompanyOwnerNumber(rootDir);
+  if (!ownerNum) return false;
+  const aliases = expandWhatsAppIdentifiers(senderId, sessionDir);
+  return aliases.has(ownerNum);
+}
+
+export function getSenderMemberInfo(senderId, sessionDir, rootDir = process.env.HERMES_HOME) {
+  const members = getCompanyMembers(rootDir);
+  const aliases = expandWhatsAppIdentifiers(senderId, sessionDir);
+  for (const alias of aliases) {
+    if (members[alias]) return members[alias];
+  }
+  return null;
+}
+
 export function matchesAllowedUser(senderId, allowedUsers, sessionDir, rootDir = process.env.HERMES_HOME) {
   const effectiveAllowed = new Set(allowedUsers || []);
   const companyAllowed = getCompanyAllowedUsers(rootDir);
@@ -100,12 +143,10 @@ export function matchesAllowedUser(senderId, allowedUsers, sessionDir, rootDir =
     effectiveAllowed.add(num);
   }
 
-  // Empty allowlist = NO ONE allowed (secure default, #8389).
   if (!effectiveAllowed || effectiveAllowed.size === 0) {
     return false;
   }
 
-  // "*" means allow everyone (consistent with SIGNAL_GROUP_ALLOWED_USERS)
   if (effectiveAllowed.has('*')) {
     return true;
   }
