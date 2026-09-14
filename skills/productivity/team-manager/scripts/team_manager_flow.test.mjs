@@ -35,6 +35,59 @@ test('requires a confirmation after a partial owner revision', async () => {
   assert.deepEqual(wa.sent().slice(1), [{ chatId: 'budi', text: 'Cek stok' }]);
 });
 
+test('approval word works even trailing extra words ("gas, sudah bener")', async () => {
+  const wa = new FakeWhatsAppAdapter();
+  const flow = new TeamManagerFlow({ ownerId: 'owner', adapter: wa });
+
+  await flow.queueDraft('budi', ['Cek stok']);
+  await flow.handleOwnerMessage('gas, sudah bener');
+  assert.deepEqual(wa.sent(), [{ chatId: 'budi', text: 'Cek stok' }]);
+});
+
+test('confirmation word works even trailing extra words ("ya, kirim aja")', async () => {
+  const wa = new FakeWhatsAppAdapter();
+  const flow = new TeamManagerFlow({ ownerId: 'owner', adapter: wa });
+
+  await flow.queueDraft('budi', ['Cek stok', 'Bersihkan rak']);
+  await flow.handleOwnerMessage('budi skip poin 2, sisanya oke');
+  await flow.handleOwnerMessage('ya, kirim aja');
+  assert.deepEqual(wa.sent().slice(1), [{ chatId: 'budi', text: 'Cek stok' }]);
+});
+
+test('revision phrasing "hapus poin 1 punya budi" (reversed order) is recognised', async () => {
+  const wa = new FakeWhatsAppAdapter();
+  const flow = new TeamManagerFlow({ ownerId: 'owner', adapter: wa });
+
+  await flow.queueDraft('budi', ['Cek stok', 'Bersihkan rak']);
+  await flow.handleOwnerMessage('tolong hapus poin 1 punya budi ya');
+  assert.deepEqual(wa.sent(), [{
+    chatId: 'owner',
+    text: 'Konfirmasi: Budi poin 1 dihapus; kirim 1 instruksi sekarang?',
+  }]);
+});
+
+test('an approval word combined with a revision marker is NOT treated as blanket approval', async () => {
+  const wa = new FakeWhatsAppAdapter();
+  const flow = new TeamManagerFlow({ ownerId: 'owner', adapter: wa });
+
+  await flow.queueDraft('budi', ['Cek stok', 'Bersihkan rak']);
+  await flow.handleOwnerMessage('gas tapi budi skip poin 1');
+  // Must NOT have sent both instructions outright — revision path should fire instead.
+  assert.deepEqual(wa.sent(), [{
+    chatId: 'owner',
+    text: 'Konfirmasi: Budi poin 1 dihapus; kirim 1 instruksi sekarang?',
+  }]);
+});
+
+test('ambiguous reply ("nanti", "kayaknya oke") is neither approval nor confirmation', async () => {
+  const wa = new FakeWhatsAppAdapter();
+  const flow = new TeamManagerFlow({ ownerId: 'owner', adapter: wa });
+
+  await flow.queueDraft('budi', ['Cek stok']);
+  await flow.handleOwnerMessage('kayaknya oke deh nanti aja');
+  assert.deepEqual(wa.sent(), [], 'ambiguous reply must not trigger a send');
+});
+
 test('records an unknown sender without sending company data', async () => {
   const wa = new FakeWhatsAppAdapter();
   const flow = new TeamManagerFlow({

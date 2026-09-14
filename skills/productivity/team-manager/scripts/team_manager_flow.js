@@ -2,12 +2,26 @@ function normalize(text) {
   return String(text || '').trim().toLowerCase();
 }
 
+// First word only, punctuation stripped: lets "gas, sudah bener" or "oke siap"
+// match on intent without requiring the WHOLE message to be one exact word.
+// Still fully deterministic/rule-based (no LLM guessing) so behavior stays testable.
+function firstWord(text) {
+  return normalize(text).replace(/[.,!?;:]/g, '').split(/\s+/)[0] || '';
+}
+
+const APPROVAL_WORDS = ['oke', 'ok', 'okay', 'setuju', 'approve', 'gas', 'sip', 'lanjut', 'boleh'];
+const CONFIRMATION_WORDS = ['ya', 'iya', 'yes', 'oke', 'ok', 'okay', 'benar', 'betul', 'lanjut', 'gas'];
+// A message starting with an approval word but also naming a revision
+// ("gas tapi budi skip poin 1") must go through the revision path, not
+// wholesale-approve everything.
+const REVISION_MARKER_RE = /\bskip\b|\bhapus\b|\bbatal\b|\bkecuali\b/;
+
 function isApproval(text) {
-  return ['oke', 'setuju', 'approve', 'gas'].includes(normalize(text));
+  return APPROVAL_WORDS.includes(firstWord(text)) && !REVISION_MARKER_RE.test(normalize(text));
 }
 
 function isConfirmation(text) {
-  return ['ya', 'iya'].includes(normalize(text));
+  return CONFIRMATION_WORDS.includes(firstWord(text));
 }
 
 export class TeamManagerFlow {
@@ -59,9 +73,23 @@ export class TeamManagerFlow {
   }
 
   async #applyPartialRevision(text) {
-    const match = normalize(text).match(/^(\S+)\s+skip poin\s+(\d+),\s*sisanya oke$/);
-    if (!match) return;
-    const [, employeeId, point] = match;
+    const norm = normalize(text).replace(/[.,!?;]/g, '');
+    // Supports "<budi> skip/hapus poin <N> ..." and "... skip/hapus poin <N> ... punya <budi>"
+    // in either order — still one deterministic rule, not free-form LLM guessing.
+    // Try backward first (has an explicit punya/milik/untuk marker, so it's unambiguous);
+    // forward only accepts a name that matches an existing draft (rejects filler words
+    // like "tolong hapus poin 1" being misread as employee "tolong").
+    const backward = norm.match(/\b(?:skip|hapus|batal(?:kan)?)\s+poin\s+(\d+)\b.*?\b(?:punya|milik|untuk)\s+(\S+)/);
+    let employeeId, point;
+    if (backward) {
+      [point, employeeId] = [backward[1], backward[2]];
+    } else {
+      const forward = norm.match(/^(?:\S+\s+)*?(\S+)\s+(?:skip|hapus|batal(?:kan)?)\s+poin\s+(\d+)\b/);
+      if (forward && this.#drafts.some((d) => d.employeeId === forward[1])) {
+        [employeeId, point] = [forward[1], forward[2]];
+      }
+    }
+    if (!employeeId || !point) return;
     const draft = this.#drafts.find((item) => item.employeeId === employeeId);
     const index = Number(point) - 1;
     if (!draft || index < 0 || index >= draft.instructions.length) return;
