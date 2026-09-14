@@ -1,0 +1,17 @@
+name: hermes-team-manager
+version: 1.0.0
+description: "AI Operations Manager untuk satu bisnis/organisasi klien, lewat WhatsApp — briefing harian, approval owner, laporan tim, eskalasi."
+hermes_requires: ">=0.12.0"
+author: "Fadlee"
+license: "MIT"
+
+# Env vars yang perlu diisi installer setelah clone. Dicek terhadap .env
+# yang sudah ada supaya tidak ditanya ulang kalau sudah punya.
+env_requires:
+  - name: WHATSAPP_TEAM_MANAGER_PROFILE_ID
+    description: "ID profil ini sendiri (dipakai CLI team-manager untuk isolasi data antar klien)"
+    required: true
+  - name: TEAM_MANAGER_OWNER_ID
+    description: "Identifier owner/manajer untuk TeamManagerFlow (default: owner)"
+    required: false
+    default: "owner"

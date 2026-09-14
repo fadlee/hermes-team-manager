@@ -1,0 +1,4 @@
+agent:
+  max_turns: 150
+gateway:
+  multiplex_profiles: false
