@@ -37,6 +37,21 @@ Jangan mulai briefing sebelum minimal satu anggota tim punya jobdesk dan nomor.
 
 ## 4. Jadwalkan
 
+**Set timezone profile TERLEBIH DAHULU, sebelum membuat cronjob apa pun:**
+
+```bash
+hermes -p <id-klien> config set timezone "Asia/Jakarta"   # atau zona lokal klien
+```
+
+Cron Hermes membaca jam dari config key `timezone` (bukan `TZ` env OS, dan
+bukan `HERMES_TIMEZONE` env kecuali sengaja di-set). Kalau langkah ini
+dilewati, `hermes cron create "0 6 * * *" ...` menjadwalkan jam 06:00 **UTC**
+(= 13:00 WIB), bukan jam 6 pagi lokal — job akan tetap "jalan" tanpa error
+apa pun, cuma di jam yang salah. Kalau job sudah dibuat sebelum timezone
+di-set, jalankan `hermes cron edit <job_id> --schedule "<expr yang sama>"`
+untuk memaksa penghitungan ulang `next_run_at` dengan timezone yang benar
+(cek hasilnya: `next_run_at` harus berakhiran `+07:00`, bukan `+00:00`).
+
 Di profile klien, buat dua cronjob: briefing dan ringkasan penutup, pada jam
 yang ada di `company.md`.
 
