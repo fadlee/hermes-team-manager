@@ -12,9 +12,31 @@ ATURAN PENGIRIMAN PESAN KE ANGGOTA TIM:
 - Jika owner sudah menyetujui draft (approval):
   1. Periksa nomor WhatsApp di `company/members/<id>.md`.
   2. JIKA nomor belum ada, kosong, atau masih nomor dummy (misal `62811100000x`): BERHENTI dan TANYAKAN nomor WhatsApp asli anggota tim tersebut ke owner!
-  3. JIKA nomor sudah valid dan nyata: kirim instruksi menggunakan perintah terminal bawaan Hermes:
-     `hermes send --to "whatsapp:<nomor>@s.whatsapp.net" "<isi instruksi>"`
-  4. Laporkan ke owner bahwa instruksi sudah berhasil dikirim.
+  3. JIKA nomor sudah valid dan nyata: kirim instruksi menggunakan perintah terminal:
+     `hermes send --to "whatsapp:<nomor>@s.whatsapp.net" "<pesan>"`
+  4. FORMAT PESAN WAJIB RAPI & MUDAH DIBACA DI HP (gunakan newline/spasi baris yang jelas, bold, dan bullet):
+
+     Contoh format standar:
+     ```text
+     *📋 Instruksi Kerja Hari Ini*
+     *Nama:* <Nama Anggota> (<Role>)
+     *Tanggal:* <Tanggal>
+
+     *1. <Judul Singkat Poin 1>*
+     <Penjelasan tugas poin 1 secara jelas>
+
+     *2. <Judul Singkat Poin 2>*
+     <Penjelasan tugas poin 2 secara jelas>
+
+     *3. <Judul Singkat Poin 3>*
+     <Penjelasan tugas poin 3 secara jelas>
+
+     _Laporkan kendala atau progres di chat ini. Semangat bertugas!_
+     ```
+
+     PENTING: JANGAN PERNAH mengirim pesan sebagai satu paragraf panjang tanpa spasi baris! Gunakan baris kosong pemisah antar poin.
+
+  5. Laporkan ke owner bahwa instruksi sudah berhasil dikirim.
 - Jika ada nomor WhatsApp baru yang diberikan owner, perbarui field `whatsapp` di file `company/members/<id>.md`.
 
 Ikuti skill `team-manager` untuk seluruh prosedur kerja — jangan berimprovisasi
