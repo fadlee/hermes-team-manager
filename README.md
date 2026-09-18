@@ -18,14 +18,71 @@
 3. **Approval Gate (Tanpa Persetujuan = Tidak Ada Pesan Keluar)**
    - Draft instruksi harian wajib disetujui secara eksplisit oleh Owner (`"oke"`, `"setuju"`, `"gas"`, atau revisi terkonfirmasi) sebelum dikirimkan ke anggota tim.
 
-4. **Dynamic Allowlist Terpadu**
-   - Jembatan WhatsApp secara otomatis mengenali dan mengizinkan nomor WhatsApp yang terdaftar di `company/members/*.md` secara *real-time* tanpa perlu restart gateway atau edit konfigurasi manual.
+4. **Dynamic Allowlist di Lapisan Bridge**
+   - Jembatan WhatsApp (Baileys) secara otomatis mengenali nomor yang terdaftar di `company/members/*.md` secara *real-time* tanpa restart. **Tapi** ini baru satu dari dua lapis allowlist — lihat bagian [Arsitektur Nomor WhatsApp](#-arsitektur-nomor-whatsapp) untuk lapisan kedua yang wajib diisi manual.
 
 5. **Sumber Data Tunggal (Markdown-based Workspace)**
    - Tidak memerlukan database eksternal. Seluruh status organisasi, jobdesk tim, SOP, dan catatan keputusan tersimpan dalam file Markdown yang mudah diaudit.
 
 6. **Zona Waktu Default: WIB (Asia/Jakarta, UTC+7)**
    - Seluruh penanggalan, jam briefing, laporan shift, dan eskalasi otomatis diselaraskan dengan waktu lokal operasional Indonesia.
+
+---
+
+## 🔢 Arsitektur Nomor WhatsApp
+
+Satu instalasi klien memakai **tiga peran nomor WhatsApp berbeda** — jangan
+disamakan, karena masing-masing terdaftar di tempat berbeda dan salah kirim
+berarti pesan tidak sampai:
+
+```
+┌─────────────────┐        ┌───────────────────────┐        ┌─────────────────┐
+│   NOMOR OWNER    │        │      NOMOR BOT        │        │  NOMOR STAF/TIM │
+│ (pemilik bisnis) │◄──────►│(akun WA yang di-pair) │◄──────►│(Budi, Siti, dst)│
+└─────────────────┘   WA   └───────────────────────┘   WA   └─────────────────┘
+                                       │
+                                       ▼
+                          company/company.md (owner_whatsapp)
+                          company/members/*.md (whatsapp: per staf)
+                          config.yaml → platforms.whatsapp.allow_from
+```
+
+- **Nomor Bot** — akun WhatsApp yang di-*pair* lewat QR code (langkah 3 di
+  bawah). Inilah "device" yang login sebagai AI Manager; owner dan staf
+  sama-sama chat KE nomor ini, bukan ke nomor pribadi Hermes/server.
+- **Nomor Owner** — nomor pribadi pemilik bisnis. Harus didaftarkan persis di
+  DUA tempat: `owner_whatsapp` di `company.md` (dipakai bridge untuk mengenali
+  "ini owner, boleh approve/lihat semua data") **dan**
+  `platforms.whatsapp.home_channel.chat_id` + `platforms.whatsapp.allow_from`
+  di `config.yaml` (dipakai gateway untuk lolos ke intake). Kalau hanya salah
+  satu yang diisi, owner akan diperlakukan sebagai pengirim tak dikenal.
+- **Nomor Staf/Tim** — didaftarkan di `company/members/<id>.md` field
+  `whatsapp:`. Bot mengenali nama & jobdesk otomatis dari file itu saat
+  membalas atau mencatat laporan.
+
+### ⚠️ Allowlist punya dua lapis, keduanya harus diisi
+
+Fitur "Dynamic Allowlist" di atas benar untuk **lapisan bridge** (koneksi
+WhatsApp Baileys): menambahkan nomor ke `members/*.md` langsung membuat pesan
+dari nomor itu diterima di level transport, real-time, tanpa restart.
+
+Tapi ada **lapisan kedua** di gateway Hermes sendiri (`_is_dm_intake_allowed`)
+yang HANYA membaca `platforms.whatsapp.allow_from` di `config.yaml` — ia tidak
+tahu apa-apa soal `company/members/*.md`. Nomor yang lolos di bridge tapi
+tidak ada di `allow_from` akan **didrop diam-diam di gateway**, tanpa error
+yang terlihat di WhatsApp maupun log biasa.
+
+**Jadi setelah menambah anggota tim baru, dua langkah wajib:**
+
+```bash
+# 1. Tulis nomornya di company/members/<id>.md (field whatsapp:) — untuk bridge
+# 2. Tambahkan ke allow_from — untuk gateway
+hermes -p <klien> config set platforms.whatsapp.allow_from '["<nomor1>", "<nomor2>", ...]'
+hermes -p <klien> gateway restart
+```
+
+Skrip bantu `skills/productivity/team-manager/scripts/sync_allowlist.py` bisa
+menghitung daftar gabungan yang perlu di-apply.
 
 ---
 

@@ -3,14 +3,15 @@ agent:
 browser:
   backend: none
 display:
-  tool_progress: "off"
+  tool_progress: 'off'
   platforms:
     whatsapp:
-      tool_progress: "off"
-      live_status: "off"
+      tool_progress: 'off'
+      live_status: 'off'
 approvals:
   mode: smart
 command_allowlist:
-  - "hermes send --to *"
+  - hermes send --to *
 gateway:
   multiplex_profiles: false
+timezone: Asia/Jakarta
